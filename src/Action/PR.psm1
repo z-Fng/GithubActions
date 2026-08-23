@@ -134,6 +134,8 @@ function Test-PRFile {
         # Reset variables from previous iteration
         $manifest = $null
         $content = $null
+        $contentFormatted = $null
+        $contentUpdated = $null
         $object = $null
         $statuses = [Ordered] @{ }
 
@@ -163,15 +165,15 @@ function Test-PRFile {
             continue
         }
 
-        #region Lint
+        #region 1. Manifest format / lint
         Write-Verbose 'Lint'
 
         try {
             & (Join-Path $BINARIES_FOLDER 'formatjson.ps1') -App $manifest.Basename -Dir $MANIFESTS_LOCATION
 
-            $contentFormated = Get-Content -Path $manifest.FullName -Raw
+            $contentFormatted = Get-Content -Path $manifest.FullName -Raw
 
-            $lint = $content -eq $contentFormated
+            $lint = $content -ceq $contentFormatted
         } catch {
             $lint = $false
 
@@ -181,15 +183,15 @@ function Test-PRFile {
         $statuses.Add('Lint', $lint)
 
         Write-Verbose 'Lint done'
-        #endregion
+        #endregion 1. Manifest format / lint
 
-        #region 1. Property checks
+        #region 2. Property checks
         $statuses.Add('Description', ([bool] $object.description))
         $statuses.Add('License', ([bool] $object.license))
         # TODO: More advanced license checks
-        #endregion 1. Property checks
+        #endregion 2. Property checks
 
-        #region 2. Hashes
+        #region 3. Hashes
         if ($object.version -ne 'nightly') {
             Write-Verbose 'Hashes'
 
@@ -206,9 +208,9 @@ function Test-PRFile {
 
             Write-Verbose 'Hashes done'
         }
-        #endregion 2. Hashes
+        #endregion 3. Hashes
 
-        #region 3. Checkver and 4. Autoupdate
+        #region 4. Checkver and 5. Autoupdate
         if ($object.checkver) {
             Write-Verbose 'Checkver'
             $outputV = @(& (Join-Path $BINARIES_FOLDER 'checkver.ps1') -App $manifest.Basename -Dir $MANIFESTS_LOCATION -Force *>&1)
@@ -238,6 +240,14 @@ function Test-PRFile {
                     }
                     default { $autoupdate = $checkver }
                 }
+
+                # Fail autoupdate check if content is inconsistent after update
+                $contentUpdated = Get-Content -Path $manifest.FullName -Raw
+                if ($contentUpdated -cne $contentFormatted) {
+                    Write-LogInfo 'Autoupdate content mismatch'
+                    $autoupdate = $false
+                }
+
                 $statuses.Add('Autoupdate', $autoupdate)
 
                 # There is some hash property defined in autoupdate
@@ -254,17 +264,7 @@ function Test-PRFile {
             }
             #endregion Autoupdate
         }
-        #endregion 3. Checkver and 4. Autoupdate
-
-        #region 5. Manifest format
-        # Write-LogInfo 'Format'
-        # TODO: implement format check using array compare if possible (or just strings with raws)
-        # TODO: I am not sure if this will handle tabs and everything what could go wrong.
-        #$raw = Get-Content $manifest.Fullname -Raw
-        #$new_raw = $object | ConvertToPrettyJson
-        #$statuses.Add('Format', ($raw -eq $new_raw))
-        # Write-LogInfo 'Format done'
-        #endregion 4. Manifest format
+        #endregion 4. Checkver and 5. Autoupdate
 
         #region 6. Installation
         # Write-LogInfo 'Installation'
