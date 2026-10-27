@@ -211,13 +211,24 @@ function Test-PRFile {
         #region 3. Checkver and 4. Autoupdate
         if ($object.checkver) {
             Write-Verbose 'Checkver'
-            $outputV = @(& (Join-Path $BINARIES_FOLDER 'checkver.ps1') -App $manifest.Basename -Dir $MANIFESTS_LOCATION -Force *>&1)
+
+            $checkverThrew = $false
+            try {
+                $outputV = @(& (Join-Path $BINARIES_FOLDER 'checkver.ps1') -App $manifest.Basename -Dir $MANIFESTS_LOCATION -ForceUpdate *>&1)
+            } catch {
+                $outputV = @("Exception occurred: $($_.Exception.Message)", "$($_.ScriptStackTrace)")
+                $checkverThrew = $true
+            }
+
+            # Remove empty lines from $outputV to keep backward compatibility with older scripts
+            $outputV = @($outputV | Where-Object { $_.ToString().Trim() })
+
             Write-Verbose ($outputV -join '`r`n')
 
             $joinedOutputV = $outputV -join ' '
             # Try to match "<manifest-name>: <version>" from outputV
             $checkverRegex = "$([regex]::escape($manifest.Basename)):\s*$([regex]::escape($($object.version)))"
-            $checkver = $joinedOutputV -match $checkverRegex
+            $checkver = (-not $checkverThrew) -and ($joinedOutputV -match $checkverRegex)
             $statuses.Add('Checkver', $checkver)
             Write-Verbose 'Checkver done'
 
