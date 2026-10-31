@@ -84,7 +84,7 @@ function Send-FinalMessage {
         Add-IntoArray $message ''
         ConvertTo-CheckList $ch.Statuses | ForEach-Object { Add-IntoArray $message $_ }
         Add-IntoArray $message ''
-        Write-LogInfo -Summary "Check result for $($ch.Name)" -Message $ch.Statuses
+        Write-LogInfo -Summary "Check Results for $($ch.Name)" -Message $ch.Statuses
     }
 
     if ($Invalid.Count -gt 0) {
